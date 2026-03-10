@@ -22,3 +22,7 @@ enough to trigger filetype-based lazy loading.
   opts = {},
 }
 ```
+
+## License
+
+Licensed under [MIT license](LICENSE-MIT).
