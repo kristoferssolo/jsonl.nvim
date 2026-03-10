@@ -1,13 +1,23 @@
 local M = {}
+local configured = false
 
 M.setup = function()
-	local ok, parsers = pcall(require, "nvim-treesitter.parsers")
-	if not ok then
-		vim.notify("ndjson.nvim: nvim-treesitter not found, highlighting unavailable", vim.log.levels.WARN)
+	if configured then
 		return
 	end
 
-	parsers.get_parser_configs().jsonl = {
+	local ok, parsers = pcall(require, "nvim-treesitter.parsers")
+	if not ok then
+		return
+	end
+
+	local parser_configs = parsers.get_parser_configs()
+	if parser_configs.jsonl ~= nil then
+		configured = true
+		return
+	end
+
+	parser_configs.jsonl = {
 		install_info = {
 			url = "https://codeberg.org/kristoferssolo/tree-sitter-jsonl",
 			files = { "src/parser.c" },
@@ -15,6 +25,8 @@ M.setup = function()
 		},
 		filetype = "jsonl",
 	}
+
+	configured = true
 end
 
 return M

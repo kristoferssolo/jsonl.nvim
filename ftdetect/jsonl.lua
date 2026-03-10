@@ -1,5 +1,5 @@
 vim.filetype.add({
-	extensions = {
+	extension = {
 		jsonl = "jsonl",
 		jsonlines = "jsonl",
 		ndjson = "jsonl",
