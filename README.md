@@ -11,6 +11,7 @@ enough to trigger filetype-based lazy loading.
 ```lua
 {
   "kristoferssolo/jsonl.nvim",
+   dependencies = { "nvim-treesitter/nvim-treesitter" },
   event = {
     "BufReadPre *.jsonl",
     "BufNewFile *.jsonl",
