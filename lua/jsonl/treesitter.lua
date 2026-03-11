@@ -10,7 +10,7 @@ local default_config = {
 M.defaults = vim.deepcopy(default_config)
 M._configured = false
 
-M.setup = function()
+M.setup = function(opts)
 	local ok, parsers = pcall(require, "nvim-treesitter.parsers")
 	if not ok then
 		return
