@@ -1,0 +1,1 @@
+require("jsonl.treesitter").setup()

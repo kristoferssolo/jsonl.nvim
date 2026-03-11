@@ -5,11 +5,32 @@ JSONL / NDJSON filetype support for Neovim with Tree-sitter injection queries.
 ## lazy.nvim
 
 ```lua
-{
-  "https://codeberg.org/kristoferssolo/jsonl.nvim",
-  dependencies = { "nvim-treesitter/nvim-treesitter" },
-  ft = { "ndjson", "jsonl", "jsonlines" },
-  opts = {},
+return {
+	"https://codeberg.org/kristoferssolo/jsonl.nvim",
+	dependencies = { "nvim-treesitter/nvim-treesitter" },
+	ft = { "jsonl" },
+	opts = {},
+}
+```
+
+If `lazy.nvim` does not detect `.jsonl` before loading this plugin, register
+the filetype in `init`:
+
+```lua
+return {
+	"https://codeberg.org/kristoferssolo/bruno.nvim",
+	dependencies = { "nvim-treesitter/nvim-treesitter" },
+	init = function()
+		vim.filetype.add({
+			extension = {
+				jsonl = "jsonl",
+				jsonlines = "jsonl",
+				ndjson = "jsonl",
+			},
+		})
+	end,
+	ft = { "bruno" },
+	opts = {},
 }
 ```
 
