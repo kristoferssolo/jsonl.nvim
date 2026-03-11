@@ -7,7 +7,7 @@ JSONL / NDJSON filetype support for Neovim with Tree-sitter injection queries.
 ```lua
 {
   "https://codeberg.org/kristoferssolo/jsonl.nvim",
-   dependencies = { "nvim-treesitter/nvim-treesitter" },
+  dependencies = { "nvim-treesitter/nvim-treesitter" },
   ft = { "ndjson", "jsonl", "jsonlines" },
   opts = {},
 }
