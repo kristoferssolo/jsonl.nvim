@@ -11,82 +11,85 @@ local function notify(msg, level)
 	vim.notify(msg, level or vim.log.levels.INFO, { title = "jsonl.nvim" })
 end
 
--- Split a JSON array body at its top-level commas, ignoring commas inside
--- strings and nested arrays/objects.
-local function split_top_level(s)
-	local parts = {}
-	local depth = 0
-	local in_string = false
-	local escaped = false
-	local start = 1
+local QUOTE, BACKSLASH, COMMA = 34, 92, 44
+local LBRACKET, RBRACKET, LBRACE, RBRACE = 91, 93, 123, 125
 
-	for i = 1, #s do
-		local char = s:sub(i, i)
-		if in_string then
-			if escaped then
-				escaped = false
-			elseif char == "\\" then
-				escaped = true
-			elseif char == '"' then
-				in_string = false
-			end
-		elseif char == '"' then
-			in_string = true
-		elseif char == "{" or char == "[" then
-			depth = depth + 1
-		elseif char == "}" or char == "]" then
-			depth = depth - 1
-		elseif char == "," and depth == 0 then
-			parts[#parts + 1] = s:sub(start, i - 1)
-			start = i + 1
-		end
-	end
-
-	parts[#parts + 1] = s:sub(start)
-	return parts
+local function is_space(b)
+	return b == 32 or (b >= 9 and b <= 13)
 end
 
--- Collapse prettier's line wrapping back to a single line, preserving
--- whitespace inside strings.
-local function collapse_whitespace(s)
+-- Split a validated JSON array body into its top-level elements, each collapsed
+-- onto one line. Whitespace inside strings is kept. Elsewhere a whitespace run
+-- becomes one space, except after `[`, before `]`, and between `{` and `}`.
+-- Scans bytes so LuaJIT can compile the loop, and copies whole runs between
+-- whitespace with one `sub`.
+local function split_elements(body)
+	local elements = {}
 	local out = {}
-	local in_string = false
-	local escaped = false
-	local pending_space = false
+	local depth = 0
+	local in_string, escaped, pending_space = false, false, false
+	local run_start = nil
+	local last = nil
 
-	for i = 1, #s do
-		local char = s:sub(i, i)
-		if in_string then
-			out[#out + 1] = char
-			if escaped then
-				escaped = false
-			elseif char == "\\" then
-				escaped = true
-			elseif char == '"' then
-				in_string = false
-			end
-		elseif char == '"' then
-			if pending_space and #out > 0 and out[#out] ~= "[" then
-				out[#out + 1] = " "
-			end
-			pending_space = false
-			in_string = true
-			out[#out + 1] = char
-		elseif char:match("%s") then
-			pending_space = true
-		else
-			if pending_space and #out > 0 then
-				local prev = out[#out]
-				if prev ~= "[" and not (char == "]" or (char == "}" and prev == "{")) then
-					out[#out + 1] = " "
-				end
-			end
-			pending_space = false
-			out[#out + 1] = char
+	local function flush_run(run_end)
+		if run_start ~= nil then
+			out[#out + 1] = body:sub(run_start, run_end)
+			last = body:byte(run_end)
+			run_start = nil
 		end
 	end
 
-	return table.concat(out)
+	local function finish_element()
+		if #out > 0 then
+			elements[#elements + 1] = table.concat(out)
+		end
+		out, last, pending_space = {}, nil, false
+	end
+
+	for i = 1, #body do
+		local b = body:byte(i)
+		if in_string then
+			if escaped then
+				escaped = false
+			elseif b == BACKSLASH then
+				escaped = true
+			elseif b == QUOTE then
+				in_string = false
+			end
+		elseif is_space(b) then
+			flush_run(i - 1)
+			pending_space = true
+		elseif b == COMMA and depth == 0 then
+			flush_run(i - 1)
+			finish_element()
+		else
+			if run_start == nil then
+				if
+					pending_space
+					and last ~= nil
+					and last ~= LBRACKET
+					and b ~= RBRACKET
+					and not (b == RBRACE and last == LBRACE)
+				then
+					out[#out + 1] = " "
+				end
+				pending_space = false
+				run_start = i
+			end
+
+			if b == QUOTE then
+				in_string = true
+			elseif b == LBRACE or b == LBRACKET then
+				depth = depth + 1
+			elseif b == RBRACE or b == RBRACKET then
+				depth = depth - 1
+			end
+		end
+	end
+
+	flush_run(#body)
+	finish_element()
+	return elements
 end
 
 -- Return the conversion target for the current buffer, or nil after notifying
@@ -197,15 +200,7 @@ function M.to_jsonl()
 		return
 	end
 
-	local out = {}
-	for _, element in ipairs(split_top_level(text:sub(2, -2))) do
-		element = vim.trim(element)
-		if element ~= "" then
-			out[#out + 1] = collapse_whitespace(element)
-		end
-	end
-
-	write_target(target, out)
+	write_target(target, split_elements(text:sub(2, -2)))
 end
 
 --- Convert based on the current filetype.
