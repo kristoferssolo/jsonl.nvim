@@ -113,6 +113,28 @@ opts = {
 }
 ```
 
+With `jq`. Change `--indent` to set the width, or use `--tab`. jq before 1.7
+rewrites large integers as floats.
+
+```lua
+opts = {
+	json_formatter = function(bufnr)
+		local jq = vim.fn.exepath("jq")
+		if jq == "" then
+			return
+		end
+		local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+		local stdin = table.concat(lines, "\n")
+		local result = vim.system({ jq, "--indent", "2", "." }, { stdin = stdin, text = true }):wait()
+		if result.code ~= 0 then
+			return
+		end
+		local formatted = vim.split(vim.trim(result.stdout), "\n", { plain = true })
+		vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, formatted)
+	end,
+}
+```
+
 ## Conform's `injected` formatter
 
 Conform's `injected` formatter follows the JSON injection and can reformat
