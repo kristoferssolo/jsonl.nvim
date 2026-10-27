@@ -1,6 +1,6 @@
 local M = {}
 local default_install_info = {
-	url = "https://codeberg.org/kristoferssolo/tree-sitter-jsonl",
+	url = "https://github.com/kristoferssolo/tree-sitter-jsonl",
 	files = { "src/parser.c" },
 	branch = "main",
 }
@@ -8,9 +8,6 @@ local default_config = {
 	install_info = default_install_info,
 	filetype = "jsonl",
 }
--- nvim-treesitter `main` downloads GitHub-style archives
--- (`<repo>-<ref>.tar.gz`), while Codeberg archives extract to `<repo>/`.
--- The GitHub repo is a mirror of the Codeberg repo (same commits).
 local main_install_info = {
 	url = "https://github.com/kristoferssolo/tree-sitter-jsonl",
 	branch = "main",
