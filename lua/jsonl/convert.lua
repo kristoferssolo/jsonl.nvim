@@ -89,40 +89,39 @@ local function collapse_whitespace(s)
 	return table.concat(out)
 end
 
-local function source_path()
-	local path = vim.api.nvim_buf_get_name(0)
-	if path == "" then
+-- Return the conversion target for the current buffer, or nil after notifying
+-- why the conversion cannot run.
+local function resolve_target(ext)
+	local src = vim.api.nvim_buf_get_name(0)
+	if src == "" then
 		notify("Buffer has no file name", vim.log.levels.WARN)
 		return nil
 	end
-	return path
-end
-
-local function target_path(path, ext)
-	return vim.fn.fnamemodify(path, ":r") .. ext
-end
-
-local function ensure_saved()
 	if vim.bo.modified then
 		notify("Save the buffer before converting", vim.log.levels.WARN)
-		return false
+		return nil
 	end
-	return true
+
+	local target = vim.fn.fnamemodify(src, ":r") .. ext
+	if target == src then
+		notify("Source and target are the same file", vim.log.levels.WARN)
+		return nil
+	end
+	return target
 end
 
-local function ensure_target_writable(path)
+-- Write and open the target, refusing to clobber a buffer with unsaved changes.
+local function write_target(path, lines)
 	local bufnr = vim.fn.bufnr(path)
 	if bufnr ~= -1 and vim.bo[bufnr].modified then
 		notify("Target buffer has unsaved changes: " .. path, vim.log.levels.WARN)
 		return false
 	end
-	return true
-end
 
-local function write_target(path, lines)
 	vim.fn.writefile(lines, path)
 	notify("Wrote " .. path)
 	vim.cmd("edit! " .. vim.fn.fnameescape(path))
+	return true
 end
 
 -- Run the user-provided formatter on the written buffer. A failing formatter
@@ -152,14 +151,8 @@ end
 
 --- Convert the current JSONL buffer to a JSON array file.
 function M.to_json()
-	local src = source_path()
-	if not src or not ensure_saved() then
-		return
-	end
-
-	local target = target_path(src, ".json")
-	if target == src then
-		notify("Source and target are the same file", vim.log.levels.WARN)
+	local target = resolve_target(".json")
+	if not target then
 		return
 	end
 
@@ -175,25 +168,16 @@ function M.to_json()
 		end
 	end
 
-	if not ensure_target_writable(target) then
-		return
-	end
-
 	local raw = #records == 0 and "[]" or ("[\n" .. table.concat(records, ",\n") .. "\n]")
-	write_target(target, vim.split(raw, "\n", { plain = true }))
-	apply_json_formatter(vim.api.nvim_get_current_buf(), target)
+	if write_target(target, vim.split(raw, "\n", { plain = true })) then
+		apply_json_formatter(vim.api.nvim_get_current_buf(), target)
+	end
 end
 
 --- Convert the current JSON array buffer to a JSONL file.
 function M.to_jsonl()
-	local src = source_path()
-	if not src or not ensure_saved() then
-		return
-	end
-
-	local target = target_path(src, ".jsonl")
-	if target == src then
-		notify("Source and target are the same file", vim.log.levels.WARN)
+	local target = resolve_target(".jsonl")
+	if not target then
 		return
 	end
 
@@ -221,9 +205,6 @@ function M.to_jsonl()
 		end
 	end
 
-	if not ensure_target_writable(target) then
-		return
-	end
 	write_target(target, out)
 end
 
