@@ -1,13 +1,23 @@
 # jsonl.nvim
 
-JSONL / NDJSON filetype support for Neovim with Tree-sitter injection queries.
+JSONL / NDJSON support for Neovim.
 
-## lazy.nvim
+- Detects `.jsonl`, `.jsonlines`, and `.ndjson` files as the `jsonl` filetype.
+- Highlights each line as JSON through a Tree-sitter injection.
+- Converts between JSONL and JSON arrays with `:JSONLConvert`.
+
+## Installation
+
+Requires [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter),
+either the `master` or `main` branch.
+
+With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 return {
 	"kristoferssolo/jsonl.nvim",
 	dependencies = { "nvim-treesitter/nvim-treesitter" },
+	-- Filetype detection has to run before `ft` can trigger the lazy load.
 	init = function()
 		vim.filetype.add({
 			extension = {
@@ -26,59 +36,63 @@ return {
 			desc = "Convert between JSONL and JSON",
 		},
 	},
-	opts = {
-		-- json_formatter = function(bufnr)
-		-- 	-- conform
-		-- 	require("conform").format({ bufnr = bufnr, async = false })
-		-- end,
-	},
+	opts = {},
 }
 ```
 
-## Tree-sitter parser
+Then install the parsers. Highlighting needs both `jsonl` and `json`:
 
-Install the parser once:
-
-```
-:TSInstall jsonl
+```vim
+:TSInstall jsonl json
 ```
 
-Or add `"jsonl"` to `ensure_installed` in your `nvim-treesitter` setup.
+## Converting
 
-## Converting between JSONL and JSON
+`:JSONLConvert` writes a sibling file with the other extension and opens it.
 
-The plugin adds the `:JSONLConvert` command:
+| Buffer       | Writes       | Output                     |
+| ------------ | ------------ | -------------------------- |
+| `data.jsonl` | `data.json`  | JSON array of all records  |
+| `data.json`  | `data.jsonl` | One array element per line |
 
-- In a JSONL buffer, it writes a sibling `.json` file containing a JSON array of
-  all records.
-- In a `.json` buffer containing an array, it writes a sibling `.jsonl` file
-  with one JSON value per line. JSONL output is never reformatted.
+- Save the buffer first. The command refuses to convert unsaved changes.
+- An existing target file is overwritten, unless it is open with unsaved changes.
+- Every record is validated. Blank JSONL lines are skipped.
+- JSON to JSONL keeps each element's original text, including key order and
+  number formatting. Multi-line elements are joined onto one line.
 
-The buffer must be saved first. The converted file is opened after it is
-written. No formatter runs by default; see [Formatting](#formatting) to opt in.
+## Configuration
 
-### Formatting
+```lua
+opts = {
+	-- Format the generated JSON array. See below.
+	json_formatter = nil,
+	-- Merged into the jsonl parser config passed to nvim-treesitter.
+	treesitter = nil,
+}
+```
 
-Conversion never invokes a formatter, so it behaves the same whether you use
-Conform, prettierd, or nothing at all. Opt in with `json_formatter`: it receives
-the buffer holding the written JSON array and the target path. Modify the buffer
-and the plugin writes it back; leave it untouched and the file keeps the
-unformatted output. A formatter error is reported without aborting the
-conversion.
+### Formatting JSON output
 
-With Conform, formatting matches your `formatters_by_ft` and project config.
-`async = false` is required, since the file is written back right after the hook
-returns:
+By default the JSON array is written as-is, one record per line. Set
+`json_formatter` to format it. The function receives the buffer holding the
+new file and its path. Edit the buffer and the plugin saves it. If the
+formatter throws, the plugin reports the error and keeps the unformatted file.
+JSONL output is never formatted.
+
+With [conform.nvim](https://github.com/stevearc/conform.nvim), using your
+`formatters_by_ft` and project config. `async = false` is required because the
+plugin saves the buffer right after the function returns:
 
 ```lua
 opts = {
 	json_formatter = function(bufnr)
 		require("conform").format({ bufnr = bufnr, async = false })
 	end,
-},
+}
 ```
 
-Or with `prettierd` directly:
+With `prettierd` directly:
 
 ```lua
 opts = {
@@ -96,14 +110,14 @@ opts = {
 		local formatted = vim.split(vim.trim(result.stdout), "\n", { plain = true })
 		vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, formatted)
 	end,
-},
+}
 ```
 
-## conform.nvim
+## Conform's `injected` formatter
 
-If you use [Conform](https://github.com/stevearc/conform.nvim)'s `injected` formatter, it may also try to format `jsonl`
-buffers through the JSON injection query. You can disable that by skipping the
-formatter for JSONL-style filenames:
+Conform's `injected` formatter follows the JSON injection and can reformat
+JSONL buffers, spreading records across multiple lines. Skip it for JSONL
+files:
 
 ```lua
 require("conform").setup({
@@ -121,4 +135,4 @@ require("conform").setup({
 
 ## License
 
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+MIT. See [LICENSE](LICENSE).
